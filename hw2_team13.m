@@ -376,3 +376,19 @@ end
 d = abs(d);
 end
 
+function b= online(x,y)
+d= (x+y)/(sqrt((x-10)^2 + (y-0)^2));
+if( d<2)
+    b=true;  
+else
+    b=false;
+end
+end
+
+function turnToward(serPort, x,y)
+ thet=180*((atan(y/x))/pi); 
+ turnAngle(serPort,.1,thet) 
+end
+
+end
+
