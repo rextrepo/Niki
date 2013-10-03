@@ -1,43 +1,46 @@
-% HW1 - Team 13
-% Muizz Salami - mos2108
-% Daniel Speyer - dls2192
-% Eszter Offertaler - eo2309
+function hw2_v1(r)
+neo = strcmp(class(r), 'CreateRobot');
 
-function hw2_team13(r)
-% Some things happen differently simulator vs. reality, so check that
-neo = strcmp(class(r),'CreateRobot'); % The Simulator has you, Neo.
+ONLINE = 1;
+BACKING = 2;
+TURNINGTOWALL = 3;
+ONWALL = 4;
+MAYBELOSTWALL = 5;
+SPIRALLING = 6;
+statenames = 'LBTOMS';
+state = ONLINE;
 
-% The states (since matlab has no enum)
-STARTING=1; % Has yet to encounter obstacle (go forward until you do)
-BACKING=2; % Hit wall with front, back away so we're not scraping while we turn
-TURNINGTOWALL=3; % Turn until we're parallel to the wall (exact behavior determined by touchingWhileTurning)
-ONWALL=4; % We're on the wall.  Go forward.
-MAYBELOSTWALL=5; % We lost sight of the wall.  Maybe we wandered too far; maybe we went off the edge.
-SPIRALLING=6; % We really lost the wall, go in increasing spirals until we find it again
-DONE = 7; % We completed our circumnavigation of the obstacle, go to start.
-statenames='SBTOLPD'; % To display state for debugging purposes
-state=STARTING; % Our current state
+theta = 0; % current angle (radians) robot is facing
+x = 0;
+y = 0;
 
-theta=0; % Current angle (radians) robot is facing
-% Current position of robot
-x=0;
-y=0;
-% History of robot position (for plotting)
-xhist=[0];
-yhist=[0];
-% Farthest the robot has been (to determine plot axes)
-pmin=-1;
-pmax=1;
+xhist = [0];
+yhist = [0];
+pmin = -1;
+pmax = 1;
 
-distTraveled=0; % Total distance traveled (to determine how precisely we should expect to get back to firstBump)
-iterationsSinceFirstBump=-inf; % How many times we've looped since we first bumped the obstacle
-% Position and orientation we first bumped obstacle
-firstBumpX=inf;
-firstBumpY=inf;
-firstBumpTheta=inf;
-% Starting position of robot
 xStart = 0;
 yStart = 0;
+xFinal = .5;
+yFinal = 0;
+
+% y = mx + b
+m = (yFinal - yStart) / (xFinal - xStart);
+b = yStart - m * xStart;
+threshold = .1;
+
+firstBumpX = inf;
+firstBumpY = inf;
+firstBumpTheta = inf;
+
+distTraveled = 0;
+iterationsSinceFirstBump = -inf;
+
+if neo
+    threshratio=20;
+else
+    threshratio=10;
+end
 
 beenstraight = 0; % How long we've been parellel to the wall (if high enough, speed up)
 touchingWhileTurning=0; % Used in TURNING state, indicates whether we should be touching the wall
@@ -102,9 +105,20 @@ curTH=inf;
         end
     end
 
+% function change?
 % Transition to a new state, issuing commands to the robot as needed
     function change(ns)
         switch ns
+            case ONLINE
+                endAngle = pi + atan((y-yStart) / (x-xStart));
+                diffAngle = (endAngle - mod(theta, 2 * pi)) * 180 / pi;
+                if(diffAngle > 180)
+                    diffAngle = diffAngle - 360;
+                end
+                
+                myTurn(diffAngle, .05);
+                SaveSetFwdVelAngVelCreate(r, .1, 0);
+                
             case BACKING
                 SaveSetFwdVelAngVelCreate(r,-.01,0);
             case TURNINGTOWALL
@@ -132,22 +146,40 @@ curTH=inf;
         state=ns;
     end
 
-% Clear the sensors
+
 AngleSensorRoomba(r);
 DistanceSensorRoomba(r);
-% Start moving forward
-SaveSetFwdVelAngVelCreate(r,.1,0);
 
-% If in real world, open a plot of where we've been
-if ~neo
-    figure;
+BumpRight = 0;
+BumpLeft = 0;
+BumpFront = 0;
+Wall = 0;
+
+% Calculate angle toward final position
+%endAngle = pi + atan((y-yFinal) / (x-xFinal));
+endAngle = atan2(yFinal - y, xFinal - x);
+diffAngle = (endAngle - mod(theta, 2 * pi)) * 180 / pi;
+if(diffAngle > 180)
+    diffAngle = diffAngle - 360;
 end
 
-% The main loop
-while (1)
+myTurn(diffAngle, .05);
+SaveSetFwdVelAngVelCreate(r, .1, 0);
+
+while(1)
+    if sqrt((x-xFinal)^2 + (y-yFinal)^2) < distTraveled/threshratio
+        SaveSetFwdVelAngVelCreate(r,0,0);
+        disp('WE HAVE ARRIVED!');
+        
+        break
+    end
+    
+    
+    disp('starting');
     pause(0.0001 + neo*.01); % In reality, reading the sensors is sufficient pause
     % Read bump and wall sensors
     [BumpRight,BumpLeft,WheDropRight,WheDropLeft,WheDropCaster,BumpFront] = BumpsWheelDropsSensorsRoomba(r);
+    
     if neo % In simulator, WallSensor is more accurate if we stop moving.
         SetFwdVelAngVelCreate(r,0,0)
     end
@@ -156,6 +188,28 @@ while (1)
         SetFwdVelAngVelCreate(r,curV,curTH)
     end
     
+    
+    if state == ONLINE
+        % if bumped, go to wall following algorithm
+        
+        if BumpRight | BumpLeft | BumpFront | Wall
+            change(ONWALL)
+            disp('triggered sensor');
+        else
+            disp('still on line?');
+            % otherwise keep going
+            
+            endAngle = atan2(yFinal - y, xFinal - x);
+            diffAngle = (endAngle - mod(theta, 2 * pi)) * 180 / pi;
+            if(diffAngle > 180)
+                diffAngle = diffAngle - 360;
+            end
+            
+            myTurn(diffAngle, .05);
+            SaveSetFwdVelAngVelCreate(r, .1, 0);
+            
+        end
+    end
     if state==ONWALL
         iterationsSinceFirstBump = iterationsSinceFirstBump + 1;
         % We don't actually set firstBump the first time we bump, but a few ONWALL iterations afterwards, to make sure we've really bumped properly
@@ -174,22 +228,28 @@ while (1)
     
     % Check if we're done.  The further we've gone, the less accurate our odometry, so increase the threshold
     % Also, expect better accuracy in the simulator
-    if neo
-        threshratio=20;
-    else
-        threshratio=10;
-    end
+    
     % If we're close enough to full circumnavigation, and have travelled a respectable distance, and are facing close to our original direction
-    if sqrt((x-firstBumpX)^2 + (y-firstBumpY)^2) < distTraveled/threshratio && distTraveled > 1 && angleDiff(theta,firstBumpTheta) < pi/2
+    % TODO: make it check perpendicular distance D:
+    % ALSO... Dude, need to make sure you're not hitting the obstacle still
+    %   especially at start... Possibly start a counter?
+    if abs(y - (m * x + b)) < threshold && x > firstBumpX
         SaveSetFwdVelAngVelCreate(r,0,0);
-        disp('Finished Success!');
-        state=DONE;
+        
+        state=ONLINE;
+        
+        
+    elseif sqrt((x-firstBumpX)^2 + (y-firstBumpY)^2) < distTraveled/threshratio && distTraveled > 1 && angleDiff(theta,firstBumpTheta) < pi/2
+        SaveSetFwdVelAngVelCreate(r,0,0);
+        disp('FAILED!');
+        
         break
     end
     
+    
     % Check if we need to change states
     % We've bumped
-    if ((BumpFront && state~=ONWALL) || (state==STARTING && BumpLeft))
+    if ((BumpFront && state~=ONWALL) || (state==ONLINE && BumpLeft))
         if neo
             % In the simulator, the wall sensor doesn't work well at range, so turn immediately
             change(TURNINGTOWALL);
@@ -205,7 +265,7 @@ while (1)
     elseif (state==ONWALL && BumpFront)
         myTurn(16,.05);
         % We found the wall
-    elseif (state==STARTING && Wall)
+    elseif (state==ONLINE && Wall)
         change(ONWALL);
         iterationsSinceFirstBump = 0;
         % We've finished backing away from a wall
@@ -285,52 +345,7 @@ while (1)
         end
     end
 end
-
-disp('Starting movement back to start');
-% Calculate angle toward start position
-endAngle = pi + atan((y-yStart) / (x-xStart));
-diffAngle = (endAngle - mod(theta, 2 * pi)) * 180 / pi;
-if(diffAngle > 180)
-    diffAngle = diffAngle - 360;
 end
-
-% Turn toward start and start moving forward
-myTurn(diffAngle, .05);
-
-distFromEnd = sqrt((x-xStart)^2 + (y-yStart)^2);
-distFromEndLast = inf;
-
-while 1
-    pause(0.0001 + neo*.001);
-    
-    iterationsSinceFirstBump = iterationsSinceFirstBump + 1;
-    
-    if mod(iterationsSinceFirstBump,30)==0
-        odometry;
-        distFromEndLast = distFromEnd;
-        distFromEnd = sqrt((x-xStart)^2 + (y-yStart)^2);
-        
-        % If the distance is increasing, then we just passed our closest approach, and should stop
-        if distFromEnd > distFromEndLast
-            SetFwdVelAngVelCreate(r,0,0);
-            disp('Finished: Success For Real Now!');
-            break
-        end
-        
-        % Recalculate angle toward start position
-        endAngle = pi + atan((y-yStart) / (x-xStart));
-        diffAngle = (endAngle - mod(theta, 2 * pi)) * 180 / pi;
-        if(diffAngle > 180)
-            diffAngle = diffAngle - 360;
-        end
-        
-        % Turn toward start and start moving forward
-        myTurn(diffAngle, .05);
-        
-    end
-end
-end
-
 
 % Read the wall sensor, using appropriate code for physical robot or simulator
 function [wall_sensor] = WallSensorReadRoomba(serPort)
@@ -360,3 +375,4 @@ if d > pi
 end
 d = abs(d);
 end
+
