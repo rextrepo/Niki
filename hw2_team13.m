@@ -384,6 +384,38 @@ function ProbeAndSearch(v,serPort)
              
 end
 
+function bumped= SenseAndReact(serPort,b)
+
+%[BumpRight, BumpLeft, BumpFront, Wall, virtWall, CliffLft, ... 
+%CliffRgt, CliffFrntLft, CliffFrntRgt, LeftCurrOver, ... 
+%RightCurrOver, DirtL, DirtR, ButtonPlay, ButtonAdv, Dist, ... 
+%Angle, Volts, Current, Temp, Charge, Capacity, pCharge]= ... 
+%AllSensorsReadRoomba(serPort); 
+bumped=false;
+bump= genBump(serPort);
+BumpRight= bump(1);
+BumpFront= bump(2);
+BumpLeft= bump(3);
+
+if BumpRight || BumpLeft || BumpFront
+    disp('bumped')
+    bumped = true; 
+end
+if b && bumped
+    disp('its goin down')
+    RvrsTad(serPort)
+    if BumpRight   
+        turnAngle(serPort,.1,22);
+    elseif BumpFront
+        turnAngle(serPort,.1,45); 
+    elseif BumpLeft
+        turnAngle(serPort,.1,90);
+    end
+    Stop(serPort)
+end
+
+end
+
 function d= distanceToPoint(x,y,xo,yo)
     dx=x-xo;
     dy=y-yo;
@@ -394,4 +426,36 @@ function d=dline(xo,yo,a,b,c)
     d=abs(a*xo+b*xo+c)/sqrt(a^2+b^2)
 end
 
+function Stop(serPort)
+ SetFwdVelAngVelCreate(serPort,0,0)
+     disp('stopped')
+ pause(0.1)
+end
+
+function FwdAccel(v,serPort)
+     maxVelIncr= 0.005;
+      if abs(v) <= .4
+         v =v+maxVelIncr;
+         w = v2w(v); 
+        disp('onwards&up!')
+        SetFwdVelAngVelCreate(serPort,v,inf)
+      end
+end
+
+function RvrsTad(serPort)
+
+disp('bumpin Bass')
+Stop(serPort)
+bumped= SenseAndReact(serPort,false);
+while  bumped
+
+        disp('bumpin')
+        bumped= SenseAndReact(serPort,false);
+        SetFwdVelAngVelCreate(serPort,-.05,0)
+     pause(.1)
+     
+end
+disp('rvrs')
+Stop(serPort)
+end
 
