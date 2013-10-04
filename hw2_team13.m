@@ -141,7 +141,7 @@ curTH=inf;
                 lostfor=0;
 %                SaveSetFwdVelAngVelCreate(r,0.05,0);
             case SPIRALLING
-                spiralseg=0;
+                spiralseg=1;
                 spiralcnt=1;
         end
         state=ns;
@@ -341,7 +341,7 @@ while(1)
         % Count how long we've been spiralling
         spiralcnt = spiralcnt + 1;
         % Time for a turn and a new segment
-        if (spiralcnt > 30*spiralseg)
+        if (spiralcnt > 40*spiralseg)
             spiralcnt = 0;
             spiralseg = spiralseg + 1;
             myTurn(-40,.05);
