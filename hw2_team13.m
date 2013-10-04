@@ -139,6 +139,7 @@ curTH=inf;
                 SaveSetFwdVelAngVelCreate(r,0.05,0);
             case MAYBELOSTWALL
                 lostfor=0;
+%                SaveSetFwdVelAngVelCreate(r,0.05,0);
             case SPIRALLING
                 spiralseg=0;
                 spiralcnt=1;
@@ -205,8 +206,10 @@ while(1)
                 diffAngle = diffAngle - 360;
             end
             
-            myTurn(diffAngle, .05);
-            SaveSetFwdVelAngVelCreate(r, .1, 0);
+	    % Don't stop moving forward to tweak angle for every little thing -- only when it's worth it
+	    if abs(diffAngle) > 10
+              myTurn(diffAngle, .1);
+	    end
             
         end
     end
@@ -388,7 +391,5 @@ end
 function turnToward(serPort, x,y)
  thet=180*((atan(y/x))/pi); 
  turnAngle(serPort,.1,thet) 
-end
-
 end
 
