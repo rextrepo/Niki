@@ -110,15 +110,10 @@ curTH=inf;
     function change(ns)
         switch ns
             case ONLINE
-                endAngle = pi + atan((y-yStart) / (x-xStart));
-                diffAngle = (endAngle - mod(theta, 2 * pi)) * 180 / pi;
-                if(diffAngle > 180)
-                    diffAngle = diffAngle - 360;
-                end
-                
-                myTurn(diffAngle, .05);
-                SaveSetFwdVelAngVelCreate(r, .1, 0);
-                
+	      endAngle = atan2(yFinal - y, xFinal - x);
+              diffAngle = (endAngle - theta) * 180 / pi;
+	      diffAngle = mod(diffAngle+180, 360) - 180;
+	      myTurn(diffAngle, .1);
             case BACKING
                 SaveSetFwdVelAngVelCreate(r,-.01,0);
             case TURNINGTOWALL
@@ -156,16 +151,7 @@ BumpLeft = 0;
 BumpFront = 0;
 Wall = 0;
 
-% Calculate angle toward final position
-%endAngle = pi + atan((y-yFinal) / (x-xFinal));
-endAngle = atan2(yFinal - y, xFinal - x);
-diffAngle = (endAngle - mod(theta, 2 * pi)) * 180 / pi;
-if(diffAngle > 180)
-    diffAngle = diffAngle - 360;
-end
-
-myTurn(diffAngle, .05);
-SaveSetFwdVelAngVelCreate(r, .1, 0);
+change(ONLINE);
 
 while(1)
     if sqrt((x-xFinal)^2 + (y-yFinal)^2) < distTraveled/threshratio
@@ -175,8 +161,6 @@ while(1)
         break
     end
     
-    
-    disp('starting');
     pause(0.0001 + neo*.01); % In reality, reading the sensors is sufficient pause
     % Read bump and wall sensors
     [BumpRight,BumpLeft,WheDropRight,WheDropLeft,WheDropCaster,BumpFront] = BumpsWheelDropsSensorsRoomba(r);
@@ -197,17 +181,15 @@ while(1)
             change(ONWALL)
             disp('triggered sensor');
         else
-            disp('still on line?');
             % otherwise keep going
             
             endAngle = atan2(yFinal - y, xFinal - x);
-            diffAngle = (endAngle - mod(theta, 2 * pi)) * 180 / pi;
-            if(diffAngle > 180)
-                diffAngle = diffAngle - 360;
-            end
+            diffAngle = (endAngle - theta) * 180 / pi;
+	    diffAngle = mod(diffAngle+180, 360) - 180;
             
 	    % Don't stop moving forward to tweak angle for every little thing -- only when it's worth it
 	    if abs(diffAngle) > 10
+	       disp(sprintf('ONLINE correction: (%.2f,%.2f)->(%.2f,%.2f) needs %.1fdeg has %.1fdeg turning %.1fdeg',x,y,xFinal,yFinal,endAngle*180/pi,theta*180/pi,diffAngle));
               myTurn(diffAngle, .1);
 	    end
             
@@ -236,12 +218,8 @@ while(1)
     % TODO: make it check perpendicular distance D:
     % ALSO... Dude, need to make sure you're not hitting the obstacle still
     %   especially at start... Possibly start a counter?
-    if abs(y - (m * x + b)) < threshold && x > firstBumpX
-        SaveSetFwdVelAngVelCreate(r,0,0);
-        
-        state=ONLINE;
-        
-        
+    if state~=ONLINE && abs(y - (m * x + b)) < threshold && x - firstBumpX > threshold
+        change(ONLINE);
     elseif sqrt((x-firstBumpX)^2 + (y-firstBumpY)^2) < distTraveled/threshratio && distTraveled > 1 && angleDiff(theta,firstBumpTheta) < pi/2
         SaveSetFwdVelAngVelCreate(r,0,0);
         disp('FAILED!');
