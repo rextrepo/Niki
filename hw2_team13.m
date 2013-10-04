@@ -371,3 +371,27 @@ function turnToward(serPort, x,y)
  turnAngle(serPort,.1,thet) 
 end
 
+function ProbeAndSearch(v,serPort)
+      turnAngle(serPort,.1,-90);
+      bumped=SenseAndReact(serPort,false);
+      t=tic;
+      factor=1;
+      while ~bumped && toc(t)<factor
+          FwdAccel(v,serPort)
+          bumped=SenseAndReact(serPort,false);
+          factor++;
+      end
+             
+end
+
+function d= distanceToPoint(x,y,xo,yo)
+    dx=x-xo;
+    dy=y-yo;
+    d= sqrt(dy^2+dx^2);
+end 
+
+function d=dline(xo,yo,a,b,c)
+    d=abs(a*xo+b*xo+c)/sqrt(a^2+b^2)
+end
+
+
